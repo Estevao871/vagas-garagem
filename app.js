@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
-import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js";
+import { firebaseConfig } from "./firebase-config.js?v=4";
+import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=4";
 
 // ---------- Distribuição ativa ----------
 let VAGAS = {};     // n -> {n, sub, ap, origem}
@@ -282,7 +282,6 @@ function renderAuth() {
   $("adminInfo").hidden = !user;
   $("t-admin").hidden = !isAdmin;
   if (user) $("authSub").textContent = isAdmin ? "Administrador: " + (user.email || "") : "Conta sem permissão de administrador";
-  if (!db) { const n = $("dbNote"); n.hidden = false; n.textContent = "O app ainda não está ligado ao Firebase: só o mapa está disponível."; }
 }
 function renderAll() { renderHeader(); renderAuth(); renderMap(); renderDisp(); renderList(); renderSearch(); renderUnid(false); }
 
@@ -329,5 +328,6 @@ if (configured) {
     renderAll();
   });
 } else {
+  const n = $("dbNote"); n.hidden = false; n.textContent = "O app ainda não está ligado ao Firebase: só o mapa está disponível.";
   renderAll();
 }

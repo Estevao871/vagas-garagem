@@ -60,3 +60,6 @@ Também é preciso adicionar `localhost` em *Authorized domains* (o Firebase já
 O plano Spark do Firebase é gratuito, com limite de 50 mil leituras e 20 mil gravações por dia, muito acima do uso de um prédio de 94 apartamentos. O GitHub Pages é gratuito para repositórios públicos.
 
 > As placas e os nomes ficam no Firestore, protegidos pelas regras. O repositório público contém só o código, o mapa e a distribuição das vagas.
+
+## Publicar mudanças
+O GitHub Pages deixa os arquivos em cache por 10 minutos. Ao alterar `app.js`, `dados.js`, `styles.css` ou `firebase-config.js`, aumente o número `?v=` nas referências em `index.html` e `app.js` (ex.: `?v=4` → `?v=5`). Assim os celulares não misturam versão antiga e nova.
