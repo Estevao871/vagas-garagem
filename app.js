@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=5";
-import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=5";
+import { firebaseConfig } from "./firebase-config.js?v=6";
+import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=6";
 
 // ---------- Distribuição ativa ----------
 let VAGAS = {};     // n -> {n, sub, ap, origem}
