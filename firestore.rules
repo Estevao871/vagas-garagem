@@ -6,15 +6,7 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
-    function me() {
-      return get(/databases/$(database)/documents/moradores/$(request.auth.uid)).data;
-    }
-    function approved() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/moradores/$(request.auth.uid))
-        && me().aprovado == true;
-    }
-    function ownsAp(ap) { return approved() && me().ap == ap; }
+    function shortStr(f, max) { return f is string && f.size() <= max; }
 
     // Distribuição das vagas: pública para leitura, só admin altera
     match /config/{docId} {
@@ -28,28 +20,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Pedido de acesso de cada conta Google (um por pessoa)
-    match /moradores/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['ap', 'nome', 'email', 'aprovado', 'criadoEm'])
-        && request.resource.data.aprovado == false
-        && request.resource.data.ap is string
-        && request.resource.data.nome is string && request.resource.data.nome.size() <= 40;
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
-    }
+    // Versão aberta: qualquer pessoa com o link vê e cadastra.
+    // As regras só garantem o formato dos dados.
 
     // Veículo de cada apartamento (id do documento = apartamento, ex.: "101", "I-13")
     match /veiculos/{ap} {
-      allow read: if approved() || isAdmin();
-      allow write: if isAdmin() || ownsAp(ap);
+      allow read: if true;
+      allow delete: if ap.size() <= 6;
+      allow create, update: if ap.size() <= 6
+        && request.resource.data.keys().hasOnly(['placa', 'nome', 'modelo', 'cor', 'obs', 'atualizadoEm'])
+        && request.resource.data.placa is string && request.resource.data.placa.matches('^[A-Z0-9]{7}$')
+        && shortStr(request.resource.data.nome, 40) && request.resource.data.nome.size() > 0
+        && shortStr(request.resource.data.modelo, 40)
+        && shortStr(request.resource.data.cor, 20)
+        && shortStr(request.resource.data.obs, 120);
     }
 
     // Disponibilidade da vaga de cada apartamento (id = apartamento)
     match /disponivel/{ap} {
-      allow read: if approved() || isAdmin();
-      allow write: if isAdmin() || ownsAp(ap);
+      allow read: if true;
+      allow delete: if ap.size() <= 6;
+      allow create, update: if ap.size() <= 6
+        && request.resource.data.keys().hasOnly(['vaga', 'de', 'ate', 'obs', 'atualizadoEm'])
+        && request.resource.data.vaga is int && request.resource.data.vaga >= 1 && request.resource.data.vaga <= 200
+        && request.resource.data.de is string && request.resource.data.de.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.ate is string && request.resource.data.ate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && shortStr(request.resource.data.obs, 120);
     }
+
+    // Qualquer outra coleção fica fechada
   }
 }

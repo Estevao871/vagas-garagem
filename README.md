@@ -7,22 +7,22 @@ Mapa das vagas da garagem do prédio, com veículo de cada apartamento, vagas pr
 
 ## Quem vê o quê
 
+Versão **aberta**, sem login para moradores:
+
 | Quem | Vê | Edita |
 |---|---|---|
-| Qualquer pessoa com o link | Mapa e apartamento de cada vaga | Nada |
-| Morador aprovado | Veículos, nomes, vagas disponíveis | Só o veículo e a disponibilidade do **próprio** apartamento |
-| Administrador | Tudo | Qualquer apartamento, aprovação de moradores, distribuição das vagas |
+| Qualquer pessoa com o link | Mapa, veículos, nomes, vagas disponíveis | Veículo e disponibilidade de **qualquer** apartamento |
+| Administrador (login Google no rodapé) | Tudo | Também a distribuição das vagas (rodízio) |
 
-Fluxo do morador:
-1. Entra com Google.
-2. Informa o apartamento e o nome.
-3. Espera o administrador aprovar na aba **Moradores**.
+O morador abre o link, vai em **Minha unidade**, escolhe o apartamento, digita o nome e o veículo e salva. O celular lembra o apartamento e destaca a vaga no mapa.
+
+> Como é aberto, qualquer pessoa com o link pode alterar qualquer cadastro, e placas e nomes ficam visíveis para quem tiver o link. As regras do Firestore só validam o formato (placa com 7 caracteres, textos curtos). Para restringir no futuro, dá para adicionar um código por apartamento.
 
 ## Configuração (uma vez só)
 
 ### 1. Firebase
 1. Acesse https://console.firebase.google.com e crie um projeto (pode desativar o Google Analytics).
-2. Em **Build → Authentication → Get started**, ative o provedor **Google**.
+2. Em **Build → Authentication → Get started**, ative o provedor **Google** (usado só pelo administrador).
 3. Em **Build → Firestore Database → Create database**, escolha o modo de produção e a região `southamerica-east1` (São Paulo).
 4. Na aba **Rules** do Firestore, cole o conteúdo de [firestore.rules](firestore.rules) e clique em **Publish**.
 5. Em **Configurações do projeto → Seus apps**, adicione um app **Web (</>)**, copie o objeto `firebaseConfig` e cole em [firebase-config.js](firebase-config.js).
@@ -34,10 +34,10 @@ Fluxo do morador:
 4. No Firebase, em **Authentication → Settings → Authorized domains**, adicione `<seu-usuario>.github.io`.
 
 ### 3. Tornar-se administrador
-1. Abra o site e entre com sua conta Google.
+1. Abra o site e clique em **Área do administrador**, no rodapé, para entrar com sua conta Google.
 2. No Firebase, em **Authentication → Users**, copie o **User UID** da sua conta.
 3. No **Firestore → Data**, crie a coleção `admins` com um documento cujo **ID é o seu UID**. Os campos não importam; pode ser `nome: "admin"`.
-4. Recarregue o site. Aparecem as abas **Moradores** e **Distribuição**.
+4. Recarregue o site. Aparece a aba **Distribuição**.
 
 ## Novo rodízio de vagas
 Na aba **Distribuição** (somente admin), cole a lista nova (`Apto;Vaga` por linha), confira e salve. Todo mundo passa a ver a nova distribuição na hora.

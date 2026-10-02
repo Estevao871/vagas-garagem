@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js";
 
@@ -21,9 +21,8 @@ applyDistribution(DEFAULT_LINES, DEFAULT_VIG);
 let veiculos = {};   // ap -> {placa, modelo, cor, nome, obs}
 let disp = {};       // ap -> {vaga, de, ate, obs}
 let db = null, auth = null;
-let user = null, morador = null, isAdmin = false;
-let moradores = {};  // uid -> doc (só admin)
-let myAp = null;
+let user = null, isAdmin = false;
+let myAp = loadPref();
 let curSub = "-5", selVaga = null, dispSub = "todos", listSub = "todos";
 let unsubs = [];
 const $ = id => document.getElementById(id);
@@ -34,8 +33,10 @@ const normPlaca = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const semAcento = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
 const fmtData = s => s ? s.split("-").reverse().join("/") : "";
-const approved = () => isAdmin || (morador && morador.aprovado === true);
-const canEditAp = ap => isAdmin || (approved() && morador && morador.ap === ap);
+// versão aberta: todos com o link veem e editam (só a distribuição exige admin)
+const approved = () => true;
+function loadPref() { try { return localStorage.getItem("vg.ap"); } catch (e) { return null; } }
+function savePref(ap) { try { localStorage.setItem("vg.ap", ap); } catch (e) {} }
 
 function veicOf(n) { const v = VAGAS[n]; return v ? veiculos[v.ap] : null; }
 function nomeOf(n) { const v = veicOf(n); return v && v.nome ? v.nome : ""; }
@@ -185,11 +186,8 @@ function fillApSel() {
   const cur = $("apSel").value || myAp;
   $("apSel").innerHTML = AP_LIST.map(ap => `<option value="${esc(ap)}">${apLabel(ap)} — vaga ${pad(BY_AP[ap])}</option>`).join("");
   if (cur && BY_AP[cur]) $("apSel").value = cur;
-  $("vincAp").innerHTML = AP_LIST.map(ap => `<option value="${esc(ap)}">${apLabel(ap)}</option>`).join("");
 }
 function renderUnid(fillForms) {
-  if (!isAdmin && myAp && BY_AP[myAp]) $("apSel").value = myAp;
-  $("apSel").disabled = !isAdmin;
   const ap = $("apSel").value, n = BY_AP[ap];
   if (!n) return;
   $("unidInfo").innerHTML = cardHtml(n);
@@ -203,26 +201,29 @@ function renderUnid(fillForms) {
   }
   $("vDel").hidden = !veiculos[ap];
   $("dDel").hidden = !dispRaw(n);
-  const pode = !!db && canEditAp(ap);
+  const pode = !!db;
   ["vPlaca", "vModelo", "vCor", "vObs", "vNome", "vSave", "vDel", "dDe", "dAte", "dObs", "dSave", "dDel"].forEach(id => $(id).disabled = !pode);
   const ro = $("roNote");
   ro.hidden = pode;
-  ro.textContent = !db ? "O app ainda não está ligado ao banco de dados." : !user ? "Entre com Google para cadastrar o seu veículo." : !morador ? "Informe seu apartamento no topo da página para pedir acesso." : !approved() ? "Seu acesso está aguardando aprovação do administrador." : "";
+  ro.textContent = "Sem conexão com o banco de dados. Verifique a internet e recarregue a página.";
 }
 async function guarded(statusEl, fn, okMsg) {
   if (!db) { statusEl.textContent = "O app ainda não está ligado ao banco de dados."; return; }
   statusEl.textContent = "Salvando…";
   try { await fn(); statusEl.textContent = okMsg; }
   catch (e) {
-    statusEl.textContent = e && e.code === "permission-denied" ? "Sem permissão para essa alteração. Confira se você está aprovado para este apartamento." : "Não foi possível salvar agora. Tente de novo em alguns segundos.";
+    statusEl.textContent = e && e.code === "permission-denied" ? "Algum campo está fora do formato. Confira a placa (7 caracteres) e tente de novo." : "Não foi possível salvar agora. Tente de novo em alguns segundos.";
   }
 }
 $("fVeic").addEventListener("submit", e => {
   e.preventDefault();
   const ap = $("apSel").value;
   const placa = normPlaca($("vPlaca").value);
+  const nome = $("vNome").value.trim();
+  if (!nome) { $("vStatus").textContent = "Informe seu nome, para os vizinhos saberem de quem é o carro."; return; }
   if (placa.length !== 7) { $("vStatus").textContent = "A placa precisa ter 7 caracteres (ex.: ABC1D23)."; return; }
-  const body = { placa, modelo: $("vModelo").value.trim(), cor: $("vCor").value.trim(), obs: $("vObs").value.trim(), nome: $("vNome").value.trim(), atualizadoEm: serverTimestamp(), atualizadoPor: user.uid };
+  if (!myAp) { myAp = ap; savePref(ap); renderMap(); }
+  const body = { placa, nome, modelo: $("vModelo").value.trim(), cor: $("vCor").value.trim(), obs: $("vObs").value.trim(), atualizadoEm: serverTimestamp() };
   guarded($("vStatus"), () => setDoc(doc(db, "veiculos", ap), body), "Veículo salvo.");
 });
 $("vDel").addEventListener("click", () => {
@@ -236,38 +237,14 @@ $("fDisp").addEventListener("submit", e => {
   if (!ate) { $("dStatus").textContent = "Informe até quando a vaga fica disponível."; return; }
   if (ate < de) { $("dStatus").textContent = "A data final precisa ser igual ou depois da inicial."; return; }
   if (ate < today()) { $("dStatus").textContent = "A data final já passou."; return; }
-  const body = { vaga: n, de, ate, obs: $("dObs").value.trim(), atualizadoEm: serverTimestamp(), atualizadoPor: user.uid };
+  const body = { vaga: n, de, ate, obs: $("dObs").value.trim(), atualizadoEm: serverTimestamp() };
   guarded($("dStatus"), () => setDoc(doc(db, "disponivel", ap), body), `Vaga ${n} marcada como disponível até ${fmtData(ate)}.`);
 });
 $("dDel").addEventListener("click", () => {
   const ap = $("apSel").value;
   guarded($("dStatus"), () => deleteDoc(doc(db, "disponivel", ap)), "Disponibilidade removida.");
 });
-$("apSel").addEventListener("change", () => renderUnid(true));
-
-// ---------- Vincular apartamento ----------
-$("fVinc").addEventListener("submit", e => {
-  e.preventDefault();
-  const nome = $("vincNome").value.trim();
-  if (!nome) { $("vincStatus").textContent = "Informe seu nome para o administrador saber quem é."; return; }
-  guarded($("vincStatus"), () => setDoc(doc(db, "moradores", user.uid), {
-    ap: $("vincAp").value, nome, email: user.email || "", aprovado: false, criadoEm: serverTimestamp()
-  }), "Pedido enviado. Assim que o administrador aprovar, os dados aparecem aqui.");
-});
-
-// ---------- Moradores (admin) ----------
-function renderMoradores() {
-  if (!isAdmin) return;
-  const all = Object.entries(moradores).sort((a, b) => apSort(a[1].ap || "", b[1].ap || ""));
-  const row = ([uid, m]) => `<div class="mor"><div class="info"><b>${apLabel(esc(m.ap))} · ${esc(m.nome)}</b><span class="muted small">${esc(m.email)}</span></div>
-    <div class="actions">${m.aprovado ? "" : `<button class="btn" data-ok="${esc(uid)}">Aprovar</button>`}<button class="btn danger" data-del="${esc(uid)}">${m.aprovado ? "Remover acesso" : "Recusar"}</button></div></div>`;
-  const pend = all.filter(([, m]) => !m.aprovado), ok = all.filter(([, m]) => m.aprovado);
-  $("morPend").innerHTML = pend.length ? pend.map(row).join("") : '<p class="muted small">Nenhum pedido pendente.</p>';
-  $("morOk").innerHTML = ok.length ? ok.map(row).join("") : '<p class="muted small">Ninguém aprovado ainda.</p>';
-  document.querySelectorAll("#p-mor [data-ok]").forEach(b => b.onclick = () => updateDoc(doc(db, "moradores", b.dataset.ok), { aprovado: true }).catch(() => {}));
-  document.querySelectorAll("#p-mor [data-del]").forEach(b => b.onclick = () => deleteDoc(doc(db, "moradores", b.dataset.del)).catch(() => {}));
-  const t = $("t-mor"); t.textContent = pend.length ? `Moradores (${pend.length})` : "Moradores";
-}
+$("apSel").addEventListener("change", () => { myAp = $("apSel").value; savePref(myAp); renderUnid(true); renderMap(); });
 
 // ---------- Distribuição (admin) ----------
 function fillDistForm() { $("distVig").value = VIG; $("distTxt").value = distToText(Object.values(VAGAS).map(v => ({ ap: v.ap, vaga: v.n, origem: v.origem }))); }
@@ -287,7 +264,7 @@ $("fDist").addEventListener("submit", e => {
 $("distReset").addEventListener("click", () => guarded($("distStatus"), () => deleteDoc(doc(db, "config", "distribuicao")), "Voltou para a distribuição padrão do código."));
 
 // ---------- Abas ----------
-const TABS = ["mapa", "disp", "lista", "unid", "mor", "admin"];
+const TABS = ["mapa", "disp", "lista", "unid", "admin"];
 function showTab(t) {
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   TABS.forEach(p => $("p-" + p).hidden = p !== t);
@@ -301,38 +278,25 @@ function renderHeader() {
   $("contagem").textContent = AP_LIST.length + " vagas · Subsolos -5, -6 e -7";
 }
 function renderAuth() {
-  const t = $("authTitle"), s = $("authSub");
   $("btnLogin").hidden = !!user || !db;
-  $("btnLogout").hidden = !user;
-  $("vincular").hidden = !(user && !morador && !isAdmin);
-  $("t-mor").hidden = $("t-admin").hidden = !isAdmin;
-  if (!db) { t.textContent = "Modo consulta"; s.textContent = "O app ainda não está ligado ao Firebase. Veja o README."; return; }
-  if (!user) { t.textContent = "Você está vendo só o mapa"; s.textContent = "Entre com Google para ver os veículos e cadastrar o seu."; return; }
-  t.textContent = user.displayName || user.email || "Conectado";
-  if (isAdmin) s.textContent = "Administrador";
-  else if (!morador) s.textContent = "Informe seu apartamento abaixo para pedir acesso.";
-  else if (!morador.aprovado) s.textContent = `${apLabel(morador.ap)} · aguardando aprovação`;
-  else s.textContent = `${apLabel(morador.ap)} · vaga ${pad(BY_AP[morador.ap] || 0)}`;
+  $("adminInfo").hidden = !user;
+  $("t-admin").hidden = !isAdmin;
+  if (user) $("authSub").textContent = isAdmin ? "Administrador: " + (user.email || "") : "Conta sem permissão de administrador";
+  if (!db) { const n = $("dbNote"); n.hidden = false; n.textContent = "O app ainda não está ligado ao Firebase: só o mapa está disponível."; }
 }
-function renderAll() { renderHeader(); renderAuth(); renderMap(); renderDisp(); renderList(); renderSearch(); renderUnid(false); renderMoradores(); }
+function renderAll() { renderHeader(); renderAuth(); renderMap(); renderDisp(); renderList(); renderSearch(); renderUnid(false); }
 
 let qTimer; $("q").addEventListener("input", () => { clearTimeout(qTimer); qTimer = setTimeout(renderSearch, 120); });
 
 // ---------- Firebase ----------
-function stopData() { unsubs.forEach(u => u()); unsubs = []; veiculos = {}; disp = {}; moradores = {}; }
 function startData() {
-  stopData();
-  if (!approved()) return;
   let first = true;
-  unsubs.push(onSnapshot(collection(db, "veiculos"), s => {
+  onSnapshot(collection(db, "veiculos"), s => {
     veiculos = {}; s.forEach(d => veiculos[d.id] = d.data()); renderAll(); if (first) { first = false; renderUnid(true); }
-  }, () => {}));
-  unsubs.push(onSnapshot(collection(db, "disponivel"), s => {
+  }, () => { const n = $("dbNote"); n.hidden = false; n.textContent = "Não foi possível carregar os veículos. Recarregue a página."; });
+  onSnapshot(collection(db, "disponivel"), s => {
     disp = {}; s.forEach(d => disp[d.id] = d.data()); renderAll();
-  }, () => {}));
-  if (isAdmin) unsubs.push(onSnapshot(collection(db, "moradores"), s => {
-    moradores = {}; s.forEach(d => moradores[d.id] = d.data()); renderMoradores();
-  }, () => {}));
+  }, () => {});
 }
 
 fillApSel();
@@ -344,10 +308,8 @@ if (configured) {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   auth = getAuth(app);
-  $("btnLogin").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(e => {
-    if (e && e.code !== "auth/popup-closed-by-user") { $("authSub").textContent = "Não foi possível entrar. Libere pop-ups para este site e tente de novo."; }
-  });
-  $("btnLogout").onclick = () => signOut(auth);
+  $("btnLogin").onclick = e => { e.preventDefault(); signInWithPopup(auth, new GoogleAuthProvider()).catch(() => {}); };
+  $("btnLogout").onclick = e => { e.preventDefault(); signOut(auth); };
 
   // distribuição: pública
   onSnapshot(doc(db, "config", "distribuicao"), s => {
@@ -358,21 +320,13 @@ if (configured) {
     if (isAdmin) fillDistForm();
   }, () => {});
 
-  let unsubMe = null;
+  startData();
   onAuthStateChanged(auth, async u => {
-    user = u; morador = null; isAdmin = false; myAp = null;
-    if (unsubMe) { unsubMe(); unsubMe = null; }
-    stopData();
-    if (!u) { renderAll(); renderUnid(true); return; }
-    try { isAdmin = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch (e) { isAdmin = false; }
+    user = u; isAdmin = false;
+    if (u) { try { isAdmin = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch (e) { isAdmin = false; } }
     if (isAdmin) fillDistForm();
-    unsubMe = onSnapshot(doc(db, "moradores", u.uid), s => {
-      const wasOk = approved();
-      morador = s.exists() ? s.data() : null;
-      myAp = morador && morador.aprovado ? morador.ap : null;
-      if (approved() !== wasOk || !unsubs.length) startData();
-      renderAll(); renderUnid(true);
-    }, () => { morador = null; startData(); renderAll(); });
+    else if ($("p-admin").hidden === false) showTab("mapa");
+    renderAll();
   });
 } else {
   renderAll();

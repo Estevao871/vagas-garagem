@@ -21,27 +21,6 @@
     </div>
   </header>
 
-  <div class="authbar" id="authbar">
-    <div class="who"><b id="authTitle">Carregando…</b><span class="muted small" id="authSub"></span></div>
-    <div class="actions">
-      <button class="btn" type="button" id="btnLogin" hidden>Entrar com Google</button>
-      <button class="btn ghost" type="button" id="btnLogout" hidden>Sair</button>
-    </div>
-  </div>
-
-  <section id="vincular" class="panel" hidden>
-    <h2>Qual é o seu apartamento?</h2>
-    <p class="muted small">Seu pedido vai para a aprovação do administrador. Depois de aprovado, você vê os veículos dos outros moradores e pode cadastrar o seu.</p>
-    <form id="fVinc">
-      <div class="row">
-        <label>Apartamento <select id="vincAp"></select></label>
-        <label>Seu nome <input id="vincNome" maxlength="40" placeholder="Como os vizinhos te conhecem"></label>
-      </div>
-      <div class="actions"><button class="btn" type="submit">Pedir acesso</button></div>
-      <div class="status" id="vincStatus" role="status"></div>
-    </form>
-  </section>
-
   <section class="search" aria-label="Buscar">
     <input id="q" type="search" autocomplete="off" placeholder="Buscar placa, apartamento, vaga ou nome (ex.: ABC1D23, 101, I-13, vaga 59)">
     <div class="results" id="results"></div>
@@ -52,7 +31,6 @@
     <button role="tab" id="t-disp" aria-selected="false" data-tab="disp">Disponíveis hoje</button>
     <button role="tab" id="t-lista" aria-selected="false" data-tab="lista">Todas as vagas</button>
     <button role="tab" id="t-unid" aria-selected="false" data-tab="unid">Minha unidade</button>
-    <button role="tab" id="t-mor" aria-selected="false" data-tab="mor" hidden>Moradores</button>
     <button role="tab" id="t-admin" aria-selected="false" data-tab="admin" hidden>Distribuição</button>
   </nav>
 
@@ -87,23 +65,24 @@
 
   <section id="p-unid" class="panel" hidden>
     <h2>Minha unidade</h2>
-    <label>Apartamento
+    <label>Qual é o seu apartamento?
       <select id="apSel"></select>
     </label>
+    <p class="muted small">Este celular vai lembrar do seu apartamento e destacar a sua vaga no mapa.</p>
     <div id="unidInfo"></div>
     <div id="roNote" class="note warn" hidden></div>
     <form id="fVeic">
-      <h3>Veículo</h3>
+      <h3>Seu veículo</h3>
       <div class="row">
+        <label>Seu nome <input id="vNome" maxlength="40" placeholder="Como os vizinhos te conhecem"></label>
         <label>Placa <input id="vPlaca" maxlength="8" placeholder="ABC1D23" autocomplete="off"></label>
+      </div>
+      <div class="row">
         <label>Modelo <input id="vModelo" maxlength="40" placeholder="Onix"></label>
         <label>Cor <input id="vCor" maxlength="20" placeholder="Prata"></label>
       </div>
-      <div class="row">
-        <label>Nome do morador (opcional) <input id="vNome" maxlength="40" placeholder="Aparece para os vizinhos"></label>
-        <label>Observação <input id="vObs" maxlength="120" placeholder="Ex.: também usa moto"></label>
-      </div>
-      <p class="muted small">O nome é opcional e fica visível para os moradores aprovados.</p>
+      <label>Observação (opcional) <input id="vObs" maxlength="120" placeholder="Ex.: também usa moto"></label>
+      <p class="muted small">Nome e veículo ficam visíveis para quem tem o link desta página.</p>
       <div class="actions">
         <button class="btn" type="submit" id="vSave">Salvar veículo</button>
         <button class="btn danger" type="button" id="vDel">Remover veículo</button>
@@ -126,15 +105,6 @@
     </form>
   </section>
 
-  <section id="p-mor" class="panel" hidden>
-    <h2>Moradores</h2>
-    <p class="muted small">Aprove só quem você reconhece como morador do apartamento indicado.</p>
-    <h3>Aguardando aprovação</h3>
-    <div class="list-mor" id="morPend"></div>
-    <h3>Aprovados</h3>
-    <div class="list-mor" id="morOk"></div>
-  </section>
-
   <section id="p-admin" class="panel" hidden>
     <h2>Distribuição das vagas</h2>
     <p class="muted small">Use quando houver um novo sorteio. Cole uma linha por apartamento no formato <b>Apto;Vaga</b> ou <b>Apto;Vaga;Origem</b> (Origem: PCD, PNE ou Sorteio). O subsolo vem da posição da vaga no mapa. Os veículos continuam ligados ao apartamento. Disponibilidades de quem mudou de vaga deixam de valer. Moradores continuam vinculados ao apartamento.</p>
@@ -151,7 +121,10 @@
   </section>
 
   <div id="dbNote" class="note" hidden></div>
-  <footer>Ferramenta não oficial, feita por um morador. Em caso de divergência, vale o documento da administração.</footer>
+  <footer>
+    Ferramenta não oficial, feita por um morador. Em caso de divergência, vale o documento da administração.
+    <span class="admin-link"> · <a href="#" id="btnLogin">Área do administrador</a><span id="adminInfo" hidden><span id="authSub"></span> · <a href="#" id="btnLogout">Sair</a></span></span>
+  </footer>
 </div>
 <script type="module" src="app.js"></script>
 </body>
