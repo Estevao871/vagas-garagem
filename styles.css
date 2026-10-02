@@ -132,3 +132,4 @@ footer a:hover { color: var(--ink); }
 #unidForms a, .unid-pick a { color: var(--ink); }
 #unidPick { display: grid; gap: 12px; }
 #unidPick .actions { margin-top: 4px; }
+.b-rent { color: var(--mine); border-color: var(--mine); background: transparent; }

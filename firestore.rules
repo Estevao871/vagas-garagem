@@ -48,6 +48,21 @@ service cloud.firestore {
         && shortStr(request.resource.data.obs, 120);
     }
 
+    // Vaga alugada: carro de outro apartamento na vaga do dono (id = "v" + número da vaga)
+    match /alugueis/{id} {
+      allow read: if true;
+      allow delete: if id.size() <= 4;
+      allow create, update: if request.resource.data.keys().hasOnly(['vaga', 'donoAp', 'usoAp', 'nome', 'placa', 'modelo', 'cor', 'obs', 'atualizadoEm'])
+        && request.resource.data.vaga is int && id == 'v' + string(request.resource.data.vaga)
+        && shortStr(request.resource.data.donoAp, 6) && shortStr(request.resource.data.usoAp, 6)
+        && request.resource.data.donoAp != request.resource.data.usoAp
+        && request.resource.data.placa is string && request.resource.data.placa.matches('^[A-Z0-9]{7}$')
+        && shortStr(request.resource.data.nome, 40) && request.resource.data.nome.size() > 0
+        && shortStr(request.resource.data.modelo, 40)
+        && shortStr(request.resource.data.cor, 20)
+        && shortStr(request.resource.data.obs, 120);
+    }
+
     // Qualquer outra coleção fica fechada
   }
 }

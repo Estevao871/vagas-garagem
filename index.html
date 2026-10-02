@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="wrap">
@@ -80,6 +80,10 @@
     <div id="unidForms" hidden>
     <p class="small"><a href="#" id="unTrocar">Não é o seu apartamento? Trocar</a></p>
     <div id="roNote" class="note warn" hidden></div>
+    <div id="ownRented" class="note warn" hidden>
+      <span id="ownRentedTxt"></span>
+      <div class="actions" style="margin-top:8px"><button class="btn danger" type="button" id="ownRentedDel">Remover aluguel</button></div>
+    </div>
     <form id="fVeic">
       <h3>Seu veículo</h3>
       <div class="row">
@@ -112,6 +116,22 @@
       </div>
       <div class="status" id="dStatus" role="status"></div>
     </form>
+    <form id="fAlug">
+      <h3>Vagas alugadas</h3>
+      <p class="muted small">Aluga a vaga de outro apartamento? Cadastre aqui o carro que fica nela. Cada vaga tem um carro.</p>
+      <div class="list-mor" id="alugList"></div>
+      <div class="row">
+        <label>Número da vaga alugada <input id="aVaga" maxlength="3" inputmode="numeric" placeholder="Ex.: 76" autocomplete="off"></label>
+        <label>Seu nome <input id="aNome" maxlength="40"></label>
+        <label>Placa <input id="aPlaca" maxlength="8" placeholder="ABC1D23" autocomplete="off"></label>
+      </div>
+      <div class="row">
+        <label>Modelo <input id="aModelo" maxlength="40" placeholder="HB20"></label>
+        <label>Cor <input id="aCor" maxlength="20" placeholder="Branco"></label>
+      </div>
+      <div class="actions"><button class="btn" type="submit" id="aSave">Salvar vaga alugada</button></div>
+      <div class="status" id="aStatus" role="status"></div>
+    </form>
     </div>
   </section>
 
@@ -136,6 +156,6 @@
     <span class="admin-link"> · <a href="#" id="btnLogin">Área do administrador</a><span id="adminInfo" hidden><span id="authSub"></span> · <a href="#" id="btnLogout">Sair</a></span></span>
   </footer>
 </div>
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>

@@ -16,6 +16,8 @@ Versão **aberta**, sem login para moradores:
 
 O morador abre o link, vai em **Minha unidade**, escolhe o apartamento, digita o nome e o veículo e salva. O celular lembra o apartamento e destaca a vaga no mapa.
 
+**Vaga alugada:** cada vaga tem um carro. Quem aluga a vaga de outro apartamento cadastra o carro em *Minha unidade → Vagas alugadas*. No mapa, a vaga mostra o dono e quem usa. O dono vê o aviso e pode remover o aluguel quando ele acabar.
+
 > Como é aberto, qualquer pessoa com o link pode alterar qualquer cadastro, e placas e nomes ficam visíveis para quem tiver o link. As regras do Firestore só validam o formato (placa com 7 caracteres, textos curtos). Para restringir no futuro, dá para adicionar um código por apartamento.
 
 ## Configuração (uma vez só)

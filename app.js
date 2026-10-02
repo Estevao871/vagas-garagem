@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=6";
-import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=6";
+import { firebaseConfig } from "./firebase-config.js?v=7";
+import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=7";
 
 // ---------- Distribuição ativa ----------
 let VAGAS = {};     // n -> {n, sub, ap, origem}
@@ -20,6 +20,7 @@ applyDistribution(DEFAULT_LINES, DEFAULT_VIG);
 // ---------- Estado ----------
 let veiculos = {};   // ap -> {placa, modelo, cor, nome, obs}
 let disp = {};       // ap -> {vaga, de, ate, obs}
+let alugueis = {};   // "v<n>" -> {vaga, donoAp, usoAp, nome, placa, modelo, cor, obs}
 let db = null, auth = null;
 let user = null, isAdmin = false;
 let myAp = loadPref() || null;
@@ -38,13 +39,18 @@ const approved = () => true;
 function loadPref() { try { return localStorage.getItem("vg.ap"); } catch (e) { return null; } }
 function savePref(ap) { try { localStorage.setItem("vg.ap", ap); } catch (e) {} }
 
-function veicOf(n) { const v = VAGAS[n]; return v ? veiculos[v.ap] : null; }
+// Uma vaga tem um carro: o do dono, ou o de quem aluga a vaga (aluguel só vale se o dono ainda for o mesmo após um rodízio)
+function aluguelOf(n) { const a = alugueis["v" + n], v = VAGAS[n]; return a && v && a.donoAp === v.ap ? a : null; }
+function veicOf(n) { const a = aluguelOf(n); if (a) return a; const v = VAGAS[n]; return v ? veiculos[v.ap] : null; }
+function alugadasPor(ap) { return Object.values(alugueis).filter(a => a.usoAp === ap && aluguelOf(a.vaga)).map(a => a.vaga).sort((x, y) => x - y); }
+const rentBadge = n => aluguelOf(n) ? '<span class="badge b-rent">Alugada</span>' : "";
+function quemUsa(n) { const a = aluguelOf(n); return a ? `usada por ${apLabel(a.usoAp)}` : ""; }
 function nomeOf(n) { const v = veicOf(n); return v && v.nome ? v.nome : ""; }
 // disponibilidade só vale para a vaga que o apartamento tem hoje (após um rodízio, a antiga é ignorada)
 function dispRaw(n) { const v = VAGAS[n]; const d = v && disp[v.ap]; return d && d.vaga === n ? d : null; }
 function dispOf(n) { const d = dispRaw(n); if (!d) return null; const t = today(); return (!d.de || d.de <= t) && (!d.ate || d.ate >= t) ? d : null; }
 function dispFuture(n) { const d = dispRaw(n); return d && d.ate && d.ate >= today() ? d : null; }
-const isMine = n => !!myAp && VAGAS[n]?.ap === myAp;
+const isMine = n => !!myAp && (VAGAS[n]?.ap === myAp || aluguelOf(n)?.usoAp === myAp);
 function kindBadge(n) {
   const k = KIND[n];
   if (k === "pcd") return '<span class="badge b-pcd">PCD</span>';
@@ -103,16 +109,18 @@ function selectVaga(n, jump) {
 function relLine(other, verb) {
   const o = VAGAS[other], ov = veicOf(other);
   const extra = approved() ? `${nomeOf(other) ? ` (${esc(nomeOf(other))})` : ""}${ov && ov.placa ? ` · <span class="plate">${esc(ov.placa)}</span> ${esc(ov.modelo || "")}` : ""}` : "";
-  return `<div class="note warn">${verb} <b>vaga ${other}</b> — ${o ? apLabel(o.ap) : "sem apartamento"}${extra}</div>`;
+  const quem = aluguelOf(other) ? `${quemUsa(other)} (vaga do ${apLabel(o.ap)})` : (o ? apLabel(o.ap) : "sem apartamento");
+  return `<div class="note warn">${verb} <b>vaga ${other}</b> — ${quem}${extra}</div>`;
 }
 function renderDetail() {
   const n = selVaga;
   if (!n) return;
   const v = VAGAS[n];
   const d = dispOf(n), df = dispFuture(n), ve = veicOf(n);
-  let html = `<div class="detail-head"><span class="bignum num">Vaga ${pad(n)}</span>${kindBadge(n)}${isMine(n) ? '<span class="badge" style="color:var(--mine);border-color:var(--mine);background:var(--mine-bg)">Minha vaga</span>' : ""}${d ? '<span class="badge b-disp">Disponível hoje</span>' : ""}</div>
+  let html = `<div class="detail-head"><span class="bignum num">Vaga ${pad(n)}</span>${kindBadge(n)}${isMine(n) ? '<span class="badge" style="color:var(--mine);border-color:var(--mine);background:var(--mine-bg)">Minha vaga</span>' : ""}${rentBadge(n)}${d ? '<span class="badge b-disp">Disponível hoje</span>' : ""}</div>
     <dl class="kv">
-      <dt>Apartamento</dt><dd>${v ? `<b>${apLabel(v.ap)}</b>` : "Sem apartamento nesta distribuição"}</dd>
+      <dt>${aluguelOf(n) ? "Dono da vaga" : "Apartamento"}</dt><dd>${v ? `<b>${apLabel(v.ap)}</b>` : "Sem apartamento nesta distribuição"}</dd>
+      ${aluguelOf(n) ? `<dt>Usada por</dt><dd><b>${apLabel(esc(aluguelOf(n).usoAp))}</b> (vaga alugada)</dd>` : ""}
       ${approved() && nomeOf(n) ? `<dt>Morador</dt><dd>${esc(nomeOf(n))}</dd>` : ""}
       <dt>Subsolo</dt><dd class="num">${SUB_OF[n]}</dd>
       <dt>Definida por</dt><dd>${v ? (v.origem === "Sorteio" ? "Sorteio geral" : v.origem === "PCD" ? "Vaga PCD" : "Escolha prévia (PNE)") : "—"}</dd>
@@ -133,19 +141,28 @@ function search(q) {
   const mVaga = up.match(/^VAGA\s*(\d+)$/);
   if (mVaga) { if (SUB_OF[+mVaga[1]]) found.add(+mVaga[1]); return [...found]; }
   const apNorm = up.replace(/^I\s*-?\s*/, "I-");
-  AP_LIST.forEach(ap => { if (ap === apNorm || ap.replace(/^0/, "") === apNorm.replace(/^0/, "")) found.add(BY_AP[ap]); });
+  AP_LIST.forEach(ap => { if (ap === apNorm || ap.replace(/^0/, "") === apNorm.replace(/^0/, "")) { found.add(BY_AP[ap]); alugadasPor(ap).forEach(n => found.add(n)); } });
   if (/^\d{1,2}$/.test(up) && SUB_OF[+up]) found.add(+up);
   const p = normPlaca(raw);
-  if (p.length >= 3) Object.entries(veiculos).forEach(([ap, v]) => { if (normPlaca(v.placa).includes(p) && BY_AP[ap]) found.add(BY_AP[ap]); });
+  if (p.length >= 3) {
+    Object.entries(veiculos).forEach(([ap, v]) => { if (normPlaca(v.placa).includes(p) && BY_AP[ap]) found.add(BY_AP[ap]); });
+    Object.values(alugueis).forEach(a => { if (aluguelOf(a.vaga) && normPlaca(a.placa).includes(p)) found.add(a.vaga); });
+  }
   const qn = semAcento(raw);
-  if (/[a-z]{3,}/.test(qn)) Object.entries(veiculos).forEach(([ap, v]) => { if (v.nome && semAcento(v.nome).includes(qn) && BY_AP[ap]) found.add(BY_AP[ap]); });
+  if (/[a-z]{3,}/.test(qn)) {
+    Object.entries(veiculos).forEach(([ap, v]) => { if (v.nome && semAcento(v.nome).includes(qn) && BY_AP[ap]) found.add(BY_AP[ap]); });
+    Object.values(alugueis).forEach(a => { if (aluguelOf(a.vaga) && a.nome && semAcento(a.nome).includes(qn)) found.add(a.vaga); });
+  }
   return [...found];
 }
 function cardHtml(n, extra) {
   const v = VAGAS[n], ve = veicOf(n);
-  const ap = v ? `<b>${apLabel(v.ap)}</b>${approved() && nomeOf(n) ? " · " + esc(nomeOf(n)) : ""}` : '<span class="muted">Sem apartamento</span>';
+  const a = aluguelOf(n);
+  const ap = !v ? '<span class="muted">Sem apartamento</span>'
+    : a ? `<b>${apLabel(esc(a.usoAp))}</b>${nomeOf(n) ? " · " + esc(nomeOf(n)) : ""} <span class="muted">(vaga do ${apLabel(v.ap)})</span>`
+    : `<b>${apLabel(v.ap)}</b>${nomeOf(n) ? " · " + esc(nomeOf(n)) : ""}`;
   return `<button class="card" data-n="${n}"><span class="n num">${pad(n)}</span>
-    <span class="info"><span>${ap} · <span class="num">Subsolo ${SUB_OF[n]}</span> ${kindBadge(n)}${dispOf(n) ? ' <span class="badge b-disp">Disponível</span>' : ""}</span>
+    <span class="info"><span>${ap} · <span class="num">Subsolo ${SUB_OF[n]}</span> ${kindBadge(n)}${rentBadge(n)}${dispOf(n) ? ' <span class="badge b-disp">Disponível</span>' : ""}</span>
     <span class="small">${veicTxt(ve)}</span>${extra || ""}</span></button>`;
 }
 function bindCards(el) { el.querySelectorAll(".card").forEach(c => c.onclick = () => selectVaga(+c.dataset.n, true)); }
@@ -174,8 +191,8 @@ function renderList() {
   const rows = AP_LIST.map(ap => BY_AP[ap]).filter(n => listSub === "todos" || SUB_OF[n] === listSub);
   $("listBody").innerHTML = rows.map(n => {
     const v = VAGAS[n], ve = veicOf(n), ok = approved();
-    return `<tr data-n="${n}"><td><b>${esc(v.ap)}</b></td><td>${ok && nomeOf(n) ? esc(nomeOf(n)) : '<span class="muted">—</span>'}</td><td class="num">${pad(n)}</td><td class="num">${SUB_OF[n]}</td><td>${kindBadge(n)}</td>
-      <td>${ok && ve && ve.placa ? `<span class="plate">${esc(ve.placa)}</span> ${esc(ve.modelo || "")}` : '<span class="muted">—</span>'}</td>
+    return `<tr data-n="${n}"><td><b>${esc(v.ap)}</b></td><td>${ok && nomeOf(n) ? esc(nomeOf(n)) : '<span class="muted">—</span>'}</td><td class="num">${pad(n)}</td><td class="num">${SUB_OF[n]}</td><td>${kindBadge(n)} ${rentBadge(n)}</td>
+      <td>${ok && ve && ve.placa ? `<span class="plate">${esc(ve.placa)}</span> ${esc(ve.modelo || "")}${aluguelOf(n) ? ` <span class="muted">(${apLabel(esc(aluguelOf(n).usoAp))})</span>` : ""}` : '<span class="muted">—</span>'}</td>
       <td>${dispOf(n) ? '<span class="badge b-disp">Disponível</span>' : ""}</td></tr>`;
   }).join("");
   $("listBody").querySelectorAll("tr").forEach(tr => tr.onclick = () => selectVaga(+tr.dataset.n, true));
@@ -206,8 +223,15 @@ function renderUnid(fillForms) {
   }
   $("vDel").hidden = !veiculos[ap];
   $("dDel").hidden = !dispRaw(n);
+  // vaga própria alugada para outro apartamento
+  const al = aluguelOf(n);
+  $("fVeic").hidden = !!al;
+  $("ownRented").hidden = !al;
+  if (al) $("ownRentedTxt").innerHTML = `Sua vaga ${pad(n)} está sendo usada pelo <b>${apLabel(esc(al.usoAp))}</b>${al.nome ? " (" + esc(al.nome) + ")" : ""} · <span class="plate">${esc(al.placa)}</span>. Se o aluguel acabou, remova para cadastrar o seu carro.`;
+  renderAlugList();
+  if (fillForms) { ["aVaga", "aPlaca", "aModelo", "aCor"].forEach(id => $(id).value = ""); $("aNome").value = (veiculos[ap] || {}).nome || ""; $("aStatus").textContent = ""; }
   const pode = !!db;
-  ["vPlaca", "vModelo", "vCor", "vObs", "vNome", "vSave", "vDel", "dDe", "dAte", "dObs", "dSave", "dDel"].forEach(id => $(id).disabled = !pode);
+  ["vPlaca", "vModelo", "vCor", "vObs", "vNome", "vSave", "vDel", "dDe", "dAte", "dObs", "dSave", "dDel", "aVaga", "aNome", "aPlaca", "aModelo", "aCor", "aSave", "ownRentedDel"].forEach(id => $(id).disabled = !pode);
   const ro = $("roNote");
   ro.hidden = pode;
   ro.textContent = "Sem conexão com o banco de dados. Verifique a internet e recarregue a página.";
@@ -235,6 +259,40 @@ $("unTrocar").addEventListener("click", e => {
   renderUnid(true); renderMap();
   $("unAp").focus();
 });
+function renderAlugList() {
+  const ns = myAp ? alugadasPor(myAp) : [];
+  $("alugList").innerHTML = ns.map(n => { const a = aluguelOf(n); return `<div class="mor"><div class="info"><b>Vaga ${pad(n)} · Subsolo ${SUB_OF[n]}</b>
+    <span class="small"><span class="plate">${esc(a.placa)}</span> ${esc([a.modelo, a.cor].filter(Boolean).join(" · "))} <span class="muted">(vaga do ${apLabel(esc(a.donoAp))})</span></span></div>
+    <div class="actions"><button class="btn ghost" type="button" data-edit="${n}">Editar</button><button class="btn danger" type="button" data-rm="${n}">Remover</button></div></div>`; }).join("");
+  $("alugList").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
+    const a = aluguelOf(+b.dataset.edit); $("aVaga").value = a.vaga; $("aNome").value = a.nome || ""; $("aPlaca").value = a.placa; $("aModelo").value = a.modelo || ""; $("aCor").value = a.cor || ""; $("aPlaca").focus();
+  });
+  $("alugList").querySelectorAll("[data-rm]").forEach(b => b.onclick = () =>
+    guarded($("aStatus"), () => deleteDoc(doc(db, "alugueis", "v" + b.dataset.rm)), `Vaga ${b.dataset.rm} removida das suas vagas alugadas.`));
+}
+$("fAlug").addEventListener("submit", e => {
+  e.preventDefault();
+  const st = $("aStatus");
+  const n = parseInt(String($("aVaga").value).replace(/\D/g, ""), 10);
+  const placa = normPlaca($("aPlaca").value), nome = $("aNome").value.trim();
+  if (!n || !SUB_OF[n]) { st.textContent = "Digite o número de uma vaga que existe no mapa."; return; }
+  const dono = VAGAS[n];
+  if (!dono) { st.textContent = `A vaga ${n} não tem apartamento na distribuição atual.`; return; }
+  if (dono.ap === myAp) { st.textContent = "Essa é a sua própria vaga. Cadastre o carro dela em Seu veículo, acima."; return; }
+  const outro = aluguelOf(n);
+  if (outro && outro.usoAp !== myAp) { st.textContent = `A vaga ${n} já está cadastrada como alugada para o ${apLabel(outro.usoAp)}. Se isso mudou, peça para ele remover.`; return; }
+  if (veiculos[dono.ap] && veiculos[dono.ap].placa) { st.textContent = `A vaga ${n} já tem o veículo do ${apLabel(dono.ap)} cadastrado (${veiculos[dono.ap].placa}). Se você aluga essa vaga, peça ao dono para remover o cadastro dele.`; return; }
+  if (!nome) { st.textContent = "Informe seu nome."; return; }
+  if (placa.length !== 7) { st.textContent = "A placa precisa ter 7 caracteres (ex.: ABC1D23)."; return; }
+  const body = { vaga: n, donoAp: dono.ap, usoAp: myAp, nome, placa, modelo: $("aModelo").value.trim(), cor: $("aCor").value.trim(), obs: "", atualizadoEm: serverTimestamp() };
+  const ok = `Vaga ${n} (do ${apLabel(dono.ap)}) cadastrada como alugada por você.`;
+  guarded(st, () => setDoc(doc(db, "alugueis", "v" + n), body), ok)
+    .then(() => { if (st.textContent === ok) ["aVaga", "aPlaca", "aModelo", "aCor"].forEach(id => $(id).value = ""); });
+});
+$("ownRentedDel").addEventListener("click", () => {
+  const n = BY_AP[myAp];
+  guarded($("vStatus"), () => deleteDoc(doc(db, "alugueis", "v" + n)), "Aluguel removido. Agora você pode cadastrar o seu carro.");
+});
 async function guarded(statusEl, fn, okMsg) {
   if (!db) { statusEl.textContent = "O app ainda não está ligado ao banco de dados."; return; }
   statusEl.textContent = "Salvando…";
@@ -250,6 +308,7 @@ $("fVeic").addEventListener("submit", e => {
   const nome = $("vNome").value.trim();
   if (!nome) { $("vStatus").textContent = "Informe seu nome, para os vizinhos saberem de quem é o carro."; return; }
   if (placa.length !== 7) { $("vStatus").textContent = "A placa precisa ter 7 caracteres (ex.: ABC1D23)."; return; }
+  if (aluguelOf(BY_AP[ap])) { $("vStatus").textContent = "Sua vaga está cadastrada como alugada. Remova o aluguel antes de cadastrar o seu carro."; return; }
   const body = { placa, nome, modelo: $("vModelo").value.trim(), cor: $("vCor").value.trim(), obs: $("vObs").value.trim(), atualizadoEm: serverTimestamp() };
   guarded($("vStatus"), () => setDoc(doc(db, "veiculos", ap), body), "Veículo salvo.");
 });
@@ -319,6 +378,9 @@ function startData() {
   }, () => { const n = $("dbNote"); n.hidden = false; n.textContent = "Não foi possível carregar os veículos. Recarregue a página."; });
   onSnapshot(collection(db, "disponivel"), s => {
     disp = {}; s.forEach(d => disp[d.id] = d.data()); renderAll();
+  }, () => {});
+  onSnapshot(collection(db, "alugueis"), s => {
+    alugueis = {}; s.forEach(d => alugueis[d.id] = d.data()); renderAll();
   }, () => {});
 }
 
