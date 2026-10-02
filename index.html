@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <div class="wrap">
@@ -28,9 +28,9 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" id="t-mapa" aria-selected="true" data-tab="mapa">Mapa</button>
+    <button role="tab" id="t-unid" aria-selected="false" data-tab="unid">Minha unidade</button>
     <button role="tab" id="t-disp" aria-selected="false" data-tab="disp">Disponíveis hoje</button>
     <button role="tab" id="t-lista" aria-selected="false" data-tab="lista">Todas as vagas</button>
-    <button role="tab" id="t-unid" aria-selected="false" data-tab="unid">Minha unidade</button>
     <button role="tab" id="t-admin" aria-selected="false" data-tab="admin" hidden>Distribuição</button>
   </nav>
 
@@ -65,11 +65,20 @@
 
   <section id="p-unid" class="panel" hidden>
     <h2>Minha unidade</h2>
-    <label>Qual é o seu apartamento?
-      <select id="apSel"></select>
-    </label>
-    <p class="muted small">Este celular vai lembrar do seu apartamento e destacar a sua vaga no mapa.</p>
+    <form id="fUnid" class="unid-pick">
+      <div id="unidPick">
+        <p class="muted small">Digite o número do seu apartamento e da sua vaga. Este celular vai lembrar e destacar a sua vaga no mapa.</p>
+        <div class="row">
+          <label>Seu apartamento <input id="unAp" maxlength="6" placeholder="Ex.: 116" autocomplete="off"></label>
+          <label>Sua vaga <input id="unVaga" maxlength="3" inputmode="numeric" placeholder="Ex.: 75" autocomplete="off"></label>
+        </div>
+        <div class="actions"><button class="btn" type="submit">Continuar</button></div>
+        <div class="status" id="unStatus" role="status"></div>
+      </div>
+    </form>
     <div id="unidInfo"></div>
+    <div id="unidForms" hidden>
+    <p class="small"><a href="#" id="unTrocar">Não é o seu apartamento? Trocar</a></p>
     <div id="roNote" class="note warn" hidden></div>
     <form id="fVeic">
       <h3>Seu veículo</h3>
@@ -103,6 +112,7 @@
       </div>
       <div class="status" id="dStatus" role="status"></div>
     </form>
+    </div>
   </section>
 
   <section id="p-admin" class="panel" hidden>
@@ -126,6 +136,6 @@
     <span class="admin-link"> · <a href="#" id="btnLogin">Área do administrador</a><span id="adminInfo" hidden><span id="authSub"></span> · <a href="#" id="btnLogout">Sair</a></span></span>
   </footer>
 </div>
-<script type="module" src="app.js?v=4"></script>
+<script type="module" src="app.js?v=5"></script>
 </body>
 </html>

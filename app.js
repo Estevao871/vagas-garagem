@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=4";
-import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=4";
+import { firebaseConfig } from "./firebase-config.js?v=5";
+import { DEFAULT_VIG, DEFAULT_LINES, SUBS, LAYOUT, FRONT, BEHIND, KIND, SUB_OF, apSort, distToText, parseDist } from "./dados.js?v=5";
 
 // ---------- Distribuição ativa ----------
 let VAGAS = {};     // n -> {n, sub, ap, origem}
@@ -22,7 +22,7 @@ let veiculos = {};   // ap -> {placa, modelo, cor, nome, obs}
 let disp = {};       // ap -> {vaga, de, ate, obs}
 let db = null, auth = null;
 let user = null, isAdmin = false;
-let myAp = loadPref();
+let myAp = loadPref() || null;
 let curSub = "-5", selVaga = null, dispSub = "todos", listSub = "todos";
 let unsubs = [];
 const $ = id => document.getElementById(id);
@@ -182,14 +182,19 @@ function renderList() {
 }
 
 // ---------- Minha unidade ----------
-function fillApSel() {
-  const cur = $("apSel").value || myAp;
-  $("apSel").innerHTML = AP_LIST.map(ap => `<option value="${esc(ap)}">${apLabel(ap)} — vaga ${pad(BY_AP[ap])}</option>`).join("");
-  if (cur && BY_AP[cur]) $("apSel").value = cur;
+// O morador digita apartamento e vaga; o app confere com a distribuição antes de liberar o cadastro.
+function normAp(txt) {
+  const up = String(txt || "").trim().toUpperCase().replace(/^(AP\.?|APTO|APARTAMENTO)\s*/, "").replace(/^I\s*-?\s*/, "I-");
+  return AP_LIST.find(ap => ap === up || ap.replace(/^0+/, "") === up.replace(/^0+/, "")) || null;
 }
 function renderUnid(fillForms) {
-  const ap = $("apSel").value, n = BY_AP[ap];
-  if (!n) return;
+  const ap = myAp && BY_AP[myAp] ? myAp : null, n = ap ? BY_AP[ap] : null;
+  $("unidPick").hidden = !!ap;
+  $("unidForms").hidden = !ap;
+  if (!ap) {
+    $("unidInfo").innerHTML = "";
+    return;
+  }
   $("unidInfo").innerHTML = cardHtml(n);
   bindCards($("unidInfo"));
   if (fillForms) {
@@ -207,6 +212,29 @@ function renderUnid(fillForms) {
   ro.hidden = pode;
   ro.textContent = "Sem conexão com o banco de dados. Verifique a internet e recarregue a página.";
 }
+$("fUnid").addEventListener("submit", e => {
+  e.preventDefault();
+  const st = $("unStatus");
+  const ap = normAp($("unAp").value);
+  const vaga = parseInt(String($("unVaga").value).replace(/\D/g, ""), 10);
+  if (!$("unAp").value.trim()) { st.textContent = "Digite o número do seu apartamento."; return; }
+  if (!ap) { st.textContent = `Não encontrei o apartamento "${$("unAp").value.trim()}". Digite só o número, por exemplo 116 ou I-13.`; return; }
+  if (!vaga) { st.textContent = "Digite o número da sua vaga."; return; }
+  if (BY_AP[ap] !== vaga) {
+    st.textContent = `Pela distribuição atual, a vaga do ${apLabel(ap)} é a ${pad(BY_AP[ap])} (Subsolo ${SUB_OF[BY_AP[ap]]}), não a ${pad(vaga)}. Confira o número; se a lista estiver errada, fale com o administrador.`;
+    return;
+  }
+  st.textContent = "";
+  myAp = ap; savePref(ap);
+  renderUnid(true); renderMap();
+});
+$("unTrocar").addEventListener("click", e => {
+  e.preventDefault();
+  $("unAp").value = ""; $("unVaga").value = ""; $("unStatus").textContent = "";
+  myAp = null; savePref("");
+  renderUnid(true); renderMap();
+  $("unAp").focus();
+});
 async function guarded(statusEl, fn, okMsg) {
   if (!db) { statusEl.textContent = "O app ainda não está ligado ao banco de dados."; return; }
   statusEl.textContent = "Salvando…";
@@ -217,22 +245,20 @@ async function guarded(statusEl, fn, okMsg) {
 }
 $("fVeic").addEventListener("submit", e => {
   e.preventDefault();
-  const ap = $("apSel").value;
+  const ap = myAp;
   const placa = normPlaca($("vPlaca").value);
   const nome = $("vNome").value.trim();
   if (!nome) { $("vStatus").textContent = "Informe seu nome, para os vizinhos saberem de quem é o carro."; return; }
   if (placa.length !== 7) { $("vStatus").textContent = "A placa precisa ter 7 caracteres (ex.: ABC1D23)."; return; }
-  if (!myAp) { myAp = ap; savePref(ap); renderMap(); }
   const body = { placa, nome, modelo: $("vModelo").value.trim(), cor: $("vCor").value.trim(), obs: $("vObs").value.trim(), atualizadoEm: serverTimestamp() };
   guarded($("vStatus"), () => setDoc(doc(db, "veiculos", ap), body), "Veículo salvo.");
 });
 $("vDel").addEventListener("click", () => {
-  const ap = $("apSel").value;
-  guarded($("vStatus"), () => deleteDoc(doc(db, "veiculos", ap)), "Veículo removido.");
+  guarded($("vStatus"), () => deleteDoc(doc(db, "veiculos", myAp)), "Veículo removido.");
 });
 $("fDisp").addEventListener("submit", e => {
   e.preventDefault();
-  const ap = $("apSel").value, n = BY_AP[ap];
+  const ap = myAp, n = BY_AP[ap];
   const de = $("dDe").value || today(), ate = $("dAte").value;
   if (!ate) { $("dStatus").textContent = "Informe até quando a vaga fica disponível."; return; }
   if (ate < de) { $("dStatus").textContent = "A data final precisa ser igual ou depois da inicial."; return; }
@@ -241,10 +267,8 @@ $("fDisp").addEventListener("submit", e => {
   guarded($("dStatus"), () => setDoc(doc(db, "disponivel", ap), body), `Vaga ${n} marcada como disponível até ${fmtData(ate)}.`);
 });
 $("dDel").addEventListener("click", () => {
-  const ap = $("apSel").value;
-  guarded($("dStatus"), () => deleteDoc(doc(db, "disponivel", ap)), "Disponibilidade removida.");
+  guarded($("dStatus"), () => deleteDoc(doc(db, "disponivel", myAp)), "Disponibilidade removida.");
 });
-$("apSel").addEventListener("change", () => { myAp = $("apSel").value; savePref(myAp); renderUnid(true); renderMap(); });
 
 // ---------- Distribuição (admin) ----------
 function fillDistForm() { $("distVig").value = VIG; $("distTxt").value = distToText(Object.values(VAGAS).map(v => ({ ap: v.ap, vaga: v.n, origem: v.origem }))); }
@@ -298,7 +322,6 @@ function startData() {
   }, () => {});
 }
 
-fillApSel();
 renderAll();
 renderUnid(true);
 
@@ -315,7 +338,8 @@ if (configured) {
     const d = s.exists() ? s.data() : null;
     if (d && Array.isArray(d.linhas) && d.linhas.length) applyDistribution(d.linhas.filter(l => l && l.ap && SUB_OF[l.vaga]), d.vigencia);
     else applyDistribution(DEFAULT_LINES, DEFAULT_VIG);
-    fillApSel(); renderAll(); renderUnid(true);
+    if (myAp && !BY_AP[myAp]) myAp = null;
+    renderAll(); renderUnid(true);
     if (isAdmin) fillDistForm();
   }, () => {});
 
