@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vagas da Garagem</title>
+<meta name="description" content="Mapa das vagas da garagem, veículos dos moradores e vagas disponíveis para empréstimo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="stripe" aria-hidden="true"></div>
+    <h1>Vagas da Garagem</h1>
+    <div class="meta num">
+      <span id="vigencia">Vigência out/2026 – set/2028</span>
+      <span id="contagem">94 vagas · Subsolos -5, -6 e -7</span>
+    </div>
+  </header>
+
+  <div class="authbar" id="authbar">
+    <div class="who"><b id="authTitle">Carregando…</b><span class="muted small" id="authSub"></span></div>
+    <div class="actions">
+      <button class="btn" type="button" id="btnLogin" hidden>Entrar com Google</button>
+      <button class="btn ghost" type="button" id="btnLogout" hidden>Sair</button>
+    </div>
+  </div>
+
+  <section id="vincular" class="panel" hidden>
+    <h2>Qual é o seu apartamento?</h2>
+    <p class="muted small">Seu pedido vai para a aprovação do administrador. Depois de aprovado, você vê os veículos dos outros moradores e pode cadastrar o seu.</p>
+    <form id="fVinc">
+      <div class="row">
+        <label>Apartamento <select id="vincAp"></select></label>
+        <label>Seu nome <input id="vincNome" maxlength="40" placeholder="Como os vizinhos te conhecem"></label>
+      </div>
+      <div class="actions"><button class="btn" type="submit">Pedir acesso</button></div>
+      <div class="status" id="vincStatus" role="status"></div>
+    </form>
+  </section>
+
+  <section class="search" aria-label="Buscar">
+    <input id="q" type="search" autocomplete="off" placeholder="Buscar placa, apartamento, vaga ou nome (ex.: ABC1D23, 101, I-13, vaga 59)">
+    <div class="results" id="results"></div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="t-mapa" aria-selected="true" data-tab="mapa">Mapa</button>
+    <button role="tab" id="t-disp" aria-selected="false" data-tab="disp">Disponíveis hoje</button>
+    <button role="tab" id="t-lista" aria-selected="false" data-tab="lista">Todas as vagas</button>
+    <button role="tab" id="t-unid" aria-selected="false" data-tab="unid">Minha unidade</button>
+    <button role="tab" id="t-mor" aria-selected="false" data-tab="mor" hidden>Moradores</button>
+    <button role="tab" id="t-admin" aria-selected="false" data-tab="admin" hidden>Distribuição</button>
+  </nav>
+
+  <section id="p-mapa" class="panel">
+    <div class="chips" id="subChips"></div>
+    <div class="mapbox" id="mapbox"></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--livre-bg);border-color:var(--livre)"></i>Vaga livre (sem carro na frente)</span>
+      <span><i class="sw" style="background:var(--dupla-bg);border-color:var(--dupla)"></i>Vaga dupla</span>
+      <span><i class="sw" style="background:var(--pcd-bg);border-color:var(--pcd)"></i>PCD</span>
+      <span><i class="sw" style="background:var(--disp);border-color:var(--disp)"></i>Disponível hoje</span>
+      <span><i class="sw" style="background:var(--mine-bg);border-color:var(--mine);border-width:2.5px"></i>Minha vaga</span>
+      <span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4" fill="var(--ink)"/></svg>Veículo cadastrado</span>
+    </div>
+    <div id="detail" class="detail"><p class="muted">Toque numa vaga para ver o apartamento, o veículo e quem está na frente.</p></div>
+  </section>
+
+  <section id="p-disp" class="panel" hidden>
+    <h2>Disponíveis hoje</h2>
+    <div class="chips" id="dispChips"></div>
+    <div class="results" id="dispList"></div>
+  </section>
+
+  <section id="p-lista" class="panel" hidden>
+    <h2>Todas as vagas</h2>
+    <div class="chips" id="listChips"></div>
+    <div class="tablebox"><table>
+      <thead><tr><th>Apto</th><th>Morador</th><th>Vaga</th><th>Subsolo</th><th>Tipo</th><th>Veículo</th><th>Hoje</th></tr></thead>
+      <tbody id="listBody"></tbody>
+    </table></div>
+  </section>
+
+  <section id="p-unid" class="panel" hidden>
+    <h2>Minha unidade</h2>
+    <label>Apartamento
+      <select id="apSel"></select>
+    </label>
+    <div id="unidInfo"></div>
+    <div id="roNote" class="note warn" hidden></div>
+    <form id="fVeic">
+      <h3>Veículo</h3>
+      <div class="row">
+        <label>Placa <input id="vPlaca" maxlength="8" placeholder="ABC1D23" autocomplete="off"></label>
+        <label>Modelo <input id="vModelo" maxlength="40" placeholder="Onix"></label>
+        <label>Cor <input id="vCor" maxlength="20" placeholder="Prata"></label>
+      </div>
+      <div class="row">
+        <label>Nome do morador (opcional) <input id="vNome" maxlength="40" placeholder="Aparece para os vizinhos"></label>
+        <label>Observação <input id="vObs" maxlength="120" placeholder="Ex.: também usa moto"></label>
+      </div>
+      <p class="muted small">O nome é opcional e fica visível para os moradores aprovados.</p>
+      <div class="actions">
+        <button class="btn" type="submit" id="vSave">Salvar veículo</button>
+        <button class="btn danger" type="button" id="vDel">Remover veículo</button>
+      </div>
+      <div class="status" id="vStatus" role="status"></div>
+    </form>
+    <form id="fDisp">
+      <h3>Deixar a vaga disponível</h3>
+      <p class="muted small">Vai viajar ou está sem carro? Marque o período e outros moradores verão a vaga na aba Disponíveis hoje. A marcação some sozinha depois da data final.</p>
+      <div class="row">
+        <label>De <input id="dDe" type="date"></label>
+        <label>Até <input id="dAte" type="date"></label>
+      </div>
+      <label>Observação <input id="dObs" maxlength="120" placeholder="Ex.: chamar no interfone do 101"></label>
+      <div class="actions">
+        <button class="btn" type="submit" id="dSave">Marcar disponível</button>
+        <button class="btn danger" type="button" id="dDel">Remover disponibilidade</button>
+      </div>
+      <div class="status" id="dStatus" role="status"></div>
+    </form>
+  </section>
+
+  <section id="p-mor" class="panel" hidden>
+    <h2>Moradores</h2>
+    <p class="muted small">Aprove só quem você reconhece como morador do apartamento indicado.</p>
+    <h3>Aguardando aprovação</h3>
+    <div class="list-mor" id="morPend"></div>
+    <h3>Aprovados</h3>
+    <div class="list-mor" id="morOk"></div>
+  </section>
+
+  <section id="p-admin" class="panel" hidden>
+    <h2>Distribuição das vagas</h2>
+    <p class="muted small">Use quando houver um novo sorteio. Cole uma linha por apartamento no formato <b>Apto;Vaga</b> ou <b>Apto;Vaga;Origem</b> (Origem: PCD, PNE ou Sorteio). O subsolo vem da posição da vaga no mapa. Os veículos continuam ligados ao apartamento. Disponibilidades de quem mudou de vaga deixam de valer. Moradores continuam vinculados ao apartamento.</p>
+    <form id="fDist">
+      <label>Vigência <input id="distVig" maxlength="60" placeholder="out/2028 – set/2030"></label>
+      <label>Lista <textarea id="distTxt" rows="14" spellcheck="false" style="font-family:ui-monospace,Consolas,monospace;font-size:.9rem"></textarea></label>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="distCheck">Conferir</button>
+        <button class="btn" type="submit" id="distSave">Salvar nova distribuição</button>
+        <button class="btn danger" type="button" id="distReset">Voltar para a padrão do código</button>
+      </div>
+      <div class="status" id="distStatus" role="status"></div>
+    </form>
+  </section>
+
+  <div id="dbNote" class="note" hidden></div>
+  <footer>Ferramenta não oficial, feita por um morador. Em caso de divergência, vale o documento da administração.</footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
